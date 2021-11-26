@@ -1,5 +1,7 @@
+import os
+
 import pandas as pd
-from dash.dependencies import Input, Output
+from dash.dependencies import Input, Output, State
 from app import app
 # from serial_read import ser
 import serial
@@ -14,15 +16,20 @@ from keras.models import load_model
 from train_data_prep import square_features
 
 
-SEQ_LEN = 25
+SEQ_LEN = 40
 i = 0
-model = load_model('model_addedfeatures_SEQLEN25_1.h5')
-model2 = load_model('models/m_seqlen25_EPOCHS300_BATCHS64.h5')
+model = load_model('model_addedfeatures_addedlayers_SEQLEN40_2.h5')
+model2 = load_model('models/m_addedlayers_seqlen40_EPOCHS550_BATCHS64.h5')
 # categories = [['res'], ['circl'], ['lin'], ['shake'], ['squar']]
-categories = [['circl'], ['res'], ['squar']]
+categories = [['circl'], ['rest'], ['squar']]
 onehot_encoder = OneHotEncoder()  # sparse=False, categories=categories)  # )
 onehot_encoder.fit(categories)
-ser = serial.Serial(port='COM3', baudrate=115200)
+
+try:
+    ser = serial.Serial(port='COM3', baudrate=115200)
+except Exception as e:
+    ser = None
+
 X = [x for x in range(SEQ_LEN)]
 count_stored_points = 0
 columns = ['ax', 'ay', 'az', 'gx', 'gy', 'gz', 'a_squared', 'g_squared']
@@ -39,6 +46,11 @@ for _ in range(SEQ_LEN):
 
 
 def data_prep_normalize(deq):
+    """
+    normaliza los datos como y = (y-mean)/std
+    :param deq: los datos a preparar en formato deque max_len(SEQ_LEN)
+    :return: datos normalizados en formato np.array
+    """
     norm = lambda x: (x - mean) / std
     vf = np.vectorize(norm)
     normalized_data = np.zeros((0, SEQ_LEN))
@@ -51,58 +63,78 @@ def data_prep_normalize(deq):
 
 
 def data_prep_absvariation(deq):
+    """
+    normaliza los datos como variación absoluta con el dato anterior, escalado entre 0 y 1
+    :param deq: los datos a preparar en formato deque max_len(SEQ_LEN)
+    :return: datos normalizados en formato np.array
+    """
     df = pd.DataFrame(deq)
     df2 = df.iloc[1:, :]
     for col in df.columns:
         df[col] = df2[col] - df[col]
         df.dropna(inplace=True)
-        df[col] = scale(df[col].values)
+        df[col] = scale(df[col].values)  # escala entre 0 y 1
     normalized_data = np.array(df)
     normalized_data = np.expand_dims(normalized_data, 0)
-    return normalized_data  # normalized_data(transpuesto) es un array de (40,6)
+    return normalized_data
 
 
 @app.callback(Output('label', 'children'),
-              Input('interval2', 'n_intervals'))
-def get_data(values):
+              Input('interval2', 'n_intervals'),
+              State('checklist', 'value'))
+def get_data(_, checklist_value):
     global dfd, X, count_stored_points, i
-
+    if not ser:
+        return 'Serial not connected'
     ser.reset_input_buffer()
     serialString = ser.readline()
     dato = serialString.decode('Ascii')
     dato = dato.split(sep='\t')
 
-    # ESTO ES PARA PREDICCIONES
-    try:
-        lista = list(map(int, dato))
-        if len(lista) == 6:
-            lista.append(square_features(lista[0], lista[1], lista[2]))
-            lista.append(square_features(lista[3], lista[4], lista[5]))
-            dfd.append(lista)
-        else:
+    if checklist_value == 'predict':
+        # ESTO ES PARA PREDICCIONES
+        try:
+            lista = list(map(int, dato))
+            if len(lista) == 6:
+                lista.append(square_features(lista[0], lista[1], lista[2]))
+                lista.append(square_features(lista[3], lista[4], lista[5]))
+                dfd.append(lista)
+            else:
+                dfd.append(dfd[-1])
+        except Exception as e:
             dfd.append(dfd[-1])
-    except Exception as e:
-        dfd.append(dfd[-1])
 
-    finally:
-        prediction = model.predict(data_prep_normalize(dfd))
-        prediction2 = model2.predict(data_prep_normalize(dfd))
-        if i > 10:
-            print(prediction, prediction2)
-            i = 0
-        i += 1
-        prediction = onehot_encoder.inverse_transform(prediction)
-        prediction2 = onehot_encoder.inverse_transform(prediction2)
-        return '{} - {}'.format(prediction, prediction2)
+        finally:
+            prediction = model.predict(data_prep_normalize(dfd))
+            prediction2 = model2.predict(data_prep_normalize(dfd))
+            if i > 10:
+                print(prediction[0], prediction2[0])
+                i = 0
+            i += 1
+            prediction = onehot_encoder.inverse_transform(prediction)
+            prediction2 = onehot_encoder.inverse_transform(prediction2)
+            return '{} - {}'.format(prediction[0], prediction2[0])
+    else:
+        # ESTO ES PARA GUARDAR DATOS
+        path = './test_data/this_is_3'
+        n_files = [i for i in os.listdir(path) if checklist_value in i]
+        # lista con todos los archivos que tienen en el nombre al tipo de señal
 
-    # ESTO ES PARA GUARDAR DATOS
-    # file = open('./test_data/squar_2.csv', 'a')
-    # try:
-        # lista = list(map(int, dato))
-        # file.write(''.join([str(val)+',' for val in lista])+'\n')
-        # # file.close()
-        # count_stored_points += 1
-        # return count_stored_points
+        n_files = [int(i.split('_')[-1].split('.')[0]) for i in n_files]
+        n_files.append(0)
+        n_files = max(n_files) # TODO poner que n_files sume 1 si el callbackcontext es de los radio buttons
+
+        # print(n_files)
+        filename = '{}_{}.csv'.format(checklist_value, n_files+1)
+        file = open(path + '/' + filename, 'a')
+        try:
+            lista = list(map(int, dato))
+            file.write(''.join([str(val) + ',' for val in lista]) + '\n')
+            # file.close()
+            count_stored_points += 1
+            return count_stored_points
+        except:
+            return 'Cannot read'
 
 
 @app.callback(Output('asdasd', 'figure'),

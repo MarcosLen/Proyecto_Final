@@ -42,6 +42,13 @@ layout = html.Div([
         dbc.Row([
             dcc.Graph(id='asdasd')
             ]),
+        dbc.Row(
+            dcc.RadioItems(id='checklist', options=[{'label': 'Predict', 'value': 'predict'},
+                                                    {'label': 'Read Square', 'value': 'squar'},
+                                                    {'label': 'Read Circle', 'value': 'circl'},
+                                                    {'label': 'Read Rest', 'value': 'rest'}],
+                           value='predict', labelStyle={'display': 'inline-block', 'margin-left': '2%'})
+        ),
         dbc.Row(html.H1("CLASIFICACIÓN", id='label'), className='my-5', style={'text-align': 'center'})
     ], className='col-12 align-items-center', style=big_div_style)
 ], className='container')

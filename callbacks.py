@@ -2,6 +2,7 @@ import os
 
 import pandas as pd
 from dash.dependencies import Input, Output, State
+import dash
 from app import app
 # from serial_read import ser
 import serial
@@ -16,12 +17,13 @@ from keras.models import load_model
 from train_data_prep import square_features
 
 
-SEQ_LEN = 40
+SEQ_LEN = 12
 i = 0
-model = load_model('model_addedfeatures_addedlayers_SEQLEN40_2.h5')
-model2 = load_model('models/m_addedlayers_seqlen40_EPOCHS550_BATCHS64.h5')
+count_stored_points = 0
+# model = load_model('models/model_addedfeatures_addedlayers_absnorm_SEQLEN15_2.h5')
+model2 = load_model('models/m1639506070_addedlayers_absnorm_seqlen12_EPOCHS45_BATCHS64.h5')
 # categories = [['res'], ['circl'], ['lin'], ['shake'], ['squar']]
-categories = [['circl'], ['rest'], ['squar']]
+categories = [['circ'], ['rest'], ['squa']]
 onehot_encoder = OneHotEncoder()  # sparse=False, categories=categories)  # )
 onehot_encoder.fit(categories)
 
@@ -31,7 +33,6 @@ except Exception as e:
     ser = None
 
 X = [x for x in range(SEQ_LEN)]
-count_stored_points = 0
 columns = ['ax', 'ay', 'az', 'gx', 'gy', 'gz', 'a_squared', 'g_squared']
 axis_mean_list = [-1413.3997194950912, 3713.7786697247707, -2838.547018348624,
                   -479.115252293578, -17.25, -45.55045871559633,
@@ -43,6 +44,10 @@ axis_std_list = [4860.661003906084, 5059.2175696744125, 4503.339099820826,  # la
 dfd = deque(maxlen=SEQ_LEN)
 for _ in range(SEQ_LEN):
     dfd.append([0, 0, 0, 0, 0, 0, 0, 0])
+
+mean_std_df = pd.read_csv(('./test_data/this_is_3/' + 'mean_std.csv'))
+axis_mean_list = list(mean_std_df.loc[0])[1:]  # saco el primer valor pq es el índice del csv, no me sirve
+axis_std_list = list(mean_std_df.loc[1])[1:]
 
 
 def data_prep_normalize(deq):
@@ -81,9 +86,11 @@ def data_prep_absvariation(deq):
 
 @app.callback(Output('label', 'children'),
               Input('interval2', 'n_intervals'),
-              State('checklist', 'value'))
+              Input('checklist', 'value'))
 def get_data(_, checklist_value):
-    global dfd, X, count_stored_points, i
+    ctx = dash.callback_context
+    input_id = ctx.triggered[0]["prop_id"].split(".")[0]
+    global dfd, X, i, count_stored_points
     if not ser:
         return 'Serial not connected'
     ser.reset_input_buffer()
@@ -105,31 +112,34 @@ def get_data(_, checklist_value):
             dfd.append(dfd[-1])
 
         finally:
-            prediction = model.predict(data_prep_normalize(dfd))
+            # prediction = model.predict(data_prep_normalize(dfd))
             prediction2 = model2.predict(data_prep_normalize(dfd))
             if i > 10:
-                print(prediction[0], prediction2[0])
+                print(prediction2[0])  # prediction[0],
                 i = 0
             i += 1
-            prediction = onehot_encoder.inverse_transform(prediction)
+            # prediction = onehot_encoder.inverse_transform(prediction)
             prediction2 = onehot_encoder.inverse_transform(prediction2)
-            return '{} - {}'.format(prediction[0], prediction2[0])
+            return '{}'.format(prediction2[0])
+            # return '{}, {}'.format(prediction[0], prediction2[0])
     else:
         # ESTO ES PARA GUARDAR DATOS
         path = './test_data/this_is_3'
         n_files = [i for i in os.listdir(path) if checklist_value in i]
         # lista con todos los archivos que tienen en el nombre al tipo de señal
-
         n_files = [int(i.split('_')[-1].split('.')[0]) for i in n_files]
         n_files.append(0)
-        n_files = max(n_files) # TODO poner que n_files sume 1 si el callbackcontext es de los radio buttons
+        n_files = max(n_files)
+        if input_id == 'checklist':
+            n_files += 1
+            count_stored_points = 0
+            print(n_files)
 
-        # print(n_files)
-        filename = '{}_{}.csv'.format(checklist_value, n_files+1)
+        filename = '{}_{}.csv'.format(checklist_value, n_files)
         file = open(path + '/' + filename, 'a')
         try:
             lista = list(map(int, dato))
-            file.write(''.join([str(val) + ',' for val in lista]) + '\n')
+            file.write(','.join([str(val) for val in lista]) + '\n')
             # file.close()
             count_stored_points += 1
             return count_stored_points

@@ -14,10 +14,10 @@ df = pd.DataFrame()
 layout = html.Div([
     dcc.Location(id='url', refresh=True),
     dcc.Interval(id='interval1',
-                 interval=1280,  # in milliseconds
+                 interval=1400,  # in milliseconds
                  n_intervals=0),
     dcc.Interval(id='interval2',
-                 interval=320,  # in milliseconds
+                 interval=350,  # in milliseconds
                  n_intervals=0),
     html.Div([  # header
         html.Div([

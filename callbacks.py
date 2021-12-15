@@ -20,7 +20,7 @@ SEQ_LEN = 12
 i = 0
 count_stored_points = 0
 # model = load_model('models/model_addedfeatures_addedlayers_absnorm_SEQLEN15_2.h5')
-model2 = load_model('models/m1639506070_addedlayers_absnorm_seqlen12_EPOCHS45_BATCHS64.h5')
+model2 = load_model('models/m1639581550_removedlayersunrol_absnorm_seqlen12_EPOCHS45_BATCHS64.h5')
 # categories = [['res'], ['circl'], ['lin'], ['shake'], ['squar']]
 categories = [['circ'], ['rest'], ['squa']]
 onehot_encoder = OneHotEncoder()  # sparse=False, categories=categories)  # )

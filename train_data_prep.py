@@ -135,13 +135,13 @@ if __name__ == '__main__':
     # MODEL
     model = create_model()
     # tensorboard = TensorBoard(log_dir='logs/{}'.format(NAME))
-    checkpoint = ModelCheckpoint(f"models/m{int(time.time())}_addedlayers_absnorm_seqlen{SEQ_LEN}_EPOCHS{EPOCHS}_BATCHS{BATCH_SIZE}.h5",
+    checkpoint = ModelCheckpoint(f"models/m{int(time.time())}_removedlayersunrol_absnorm_seqlen{SEQ_LEN}_EPOCHS{EPOCHS}_BATCHS{BATCH_SIZE}.h5",
                                  monitor='val_accuracy', verbose=1, save_best_only=True, mode='max')
     model.fit(np.asarray(train_x), np.asarray(train_y),
               batch_size=BATCH_SIZE,
               epochs=EPOCHS,
               validation_data=(validation_x, validation_y),
               callbacks=[checkpoint])
-    filename = 'models/model{}_addedfeatures_addedlayers_absnorm_SEQLEN{}_2.h5'.format(int(time.time()), SEQ_LEN)
+    filename = 'models/model{}_removedlayersunrol_absnorm_SEQLEN{}_2.h5'.format(int(time.time()), SEQ_LEN)
     model.save(filename)
 

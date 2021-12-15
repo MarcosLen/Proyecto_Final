@@ -68,21 +68,16 @@ def split_dataset(total_data):
 
 
 def create_model():
-    model = Sequential()
-    model.add(LSTM(256, input_shape=(train_x.shape[1:]), activation='relu', return_sequences=True))
+    model = Sequential()  # abajo, unroll es para aumentar la velocidad de la prediccion
+    model.add(LSTM(256, input_shape=(train_x.shape[1:]), activation='relu', return_sequences=True, unroll=True))
     model.add(Dropout(0.15))
     model.add(BatchNormalization())
-    model.add(LSTM(128, input_shape=(train_x.shape[1:]), activation='relu', return_sequences=True))
-    model.add(Dropout(0.15))
-    model.add(BatchNormalization())
-    model.add(LSTM(128, input_shape=(train_x.shape[1:]), activation='relu', return_sequences=True))
+    model.add(LSTM(128, input_shape=(train_x.shape[1:]), activation='relu', return_sequences=True, unroll=True))
     model.add(Dropout(0.15))
     model.add(BatchNormalization())
     model.add(LSTM(128, input_shape=(train_x.shape[1:]), activation='relu'))
     model.add(Dropout(0.2))
     model.add(BatchNormalization())
-    model.add(Dense(32, activation='relu'))
-    model.add(Dropout(0.15))
     model.add(Dense(32, activation='relu'))
     model.add(Dropout(0.2))
     model.add(Dense(train_y.shape[-1], activation='softmax'))

@@ -6,15 +6,14 @@ import dash
 from app import app
 # from serial_read import ser
 import serial
-import plotly.express as px
 from collections import deque
-from plotly.subplots import make_subplots
 import plotly.graph_objects as go
 from sklearn.preprocessing import OneHotEncoder, scale
 import random
 import numpy as np
 from keras.models import load_model
 from train_data_prep import square_features
+import time
 
 
 SEQ_LEN = 12
@@ -88,6 +87,7 @@ def data_prep_absvariation(deq):
               Input('interval2', 'n_intervals'),
               Input('checklist', 'value'))
 def get_data(_, checklist_value):
+    start_time = time.time()
     ctx = dash.callback_context
     input_id = ctx.triggered[0]["prop_id"].split(".")[0]
     global dfd, X, i, count_stored_points
@@ -120,6 +120,7 @@ def get_data(_, checklist_value):
             i += 1
             # prediction = onehot_encoder.inverse_transform(prediction)
             prediction2 = onehot_encoder.inverse_transform(prediction2)
+            print('predict time: {}'.format(time.time() - start_time))
             return '{}'.format(prediction2[0])
             # return '{}, {}'.format(prediction[0], prediction2[0])
     else:
@@ -142,6 +143,7 @@ def get_data(_, checklist_value):
             file.write(','.join([str(val) for val in lista]) + '\n')
             # file.close()
             count_stored_points += 1
+            print('save time: {}'.format(time.time() - start_time))
             return count_stored_points
         except:
             return 'Cannot read'
@@ -150,16 +152,11 @@ def get_data(_, checklist_value):
 @app.callback(Output('asdasd', 'figure'),
               [Input('interval1', 'n_intervals')])
 def get_data(_):
+    start_time = time.time()
     npdfd = np.array(dfd)
-    fig = make_subplots(rows=4, cols=2, subplot_titles=('Acel X', 'Gyro X', 'Acel Y', 'Gyro Y',
-                                                        'Acel Z', 'Gyro Z', 'Acel^2', 'Gyro^2'))
-    fig.append_trace(go.Scatter(x=X, y=npdfd[:, 0]), row=1, col=1)
-    fig.append_trace(go.Scatter(x=X, y=npdfd[:, 1]), row=2, col=1)
-    fig.append_trace(go.Scatter(x=X, y=npdfd[:, 2]), row=3, col=1)
-    fig.append_trace(go.Scatter(x=X, y=npdfd[:, 3]), row=1, col=2)
-    fig.append_trace(go.Scatter(x=X, y=npdfd[:, 4]), row=2, col=2)
-    fig.append_trace(go.Scatter(x=X, y=npdfd[:, 5]), row=3, col=2)
-    fig.append_trace(go.Scatter(x=X, y=npdfd[:, 6]), row=4, col=1)
-    fig.append_trace(go.Scatter(x=X, y=npdfd[:, 7]), row=4, col=2)
-    fig.update_layout(showlegend=False)
+    fig = go.Figure()
+    fig.add_trace(go.Scattergl(x=X, y=npdfd[:, 6], name='Accel^2', yaxis='y'))
+    fig.add_trace(go.Scattergl(x=X, y=npdfd[:, 7], name='Gyro^2', yaxis='y2'))
+    fig.update_layout(showlegend=True, yaxis2={'overlaying': 'y', 'side': 'right'})
+    print('plot time: {}'.format(time.time() - start_time))
     return fig

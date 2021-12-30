@@ -9,8 +9,9 @@ from collections import deque
 import random
 import time
 import os
+from collections import Counter
 
-SEQ_LEN = 12
+SEQ_LEN = 20
 VAL_PCT = 0.2
 cols = ['ax', 'ay', 'az', 'gx', 'gy', 'gz']
 EPOCHS = 45
@@ -19,12 +20,7 @@ NAME = '{}-SEQ-{}-TIME'.format(SEQ_LEN, int(time.time()))
 categories = [['circ'], ['rest'], ['squa']]
 onehot_encoder = OneHotEncoder(sparse=False)
 onehot_encoder.fit(categories)
-axis_mean_list = [-1413.3997194950912, 3713.7786697247707, -2838.547018348624,
-                  -479.115252293578, -17.25, -45.55045871559633,
-                  1.3057214357366107, 0.890461854922827]  # estos datos fueron obtenidos del mean y
-axis_std_list = [4860.661003906084, 5059.2175696744125, 4503.339099820826,  # la std de los datos usados para entrenar
-                 3626.4416073840416, 3333.092355088295, 2681.0822506470254,
-                 1.1426434991136631, 1.4855471352632454]
+columns = ['ax', 'ay', 'az', 'gx', 'gy', 'gz', 'squared_a', 'squared_g']
 
 
 def square_features(col1, col2, col3):
@@ -35,16 +31,51 @@ def preprocess_df_normalize(df, path) -> list:
     mean_std_df = pd.read_csv((path + 'mean_std.csv'))
     axis_mean_list = list(mean_std_df.loc[0])[1:]  # saco el primer valor pq es el índice del csv, no me sirve
     axis_std_list = list(mean_std_df.loc[1])[1:]
-    for n, col in enumerate(df.columns):
-        if col != 'target':
-            df[col] = pd.to_numeric(df[col])
-            df[col] = (df[col]-axis_mean_list[n])/axis_std_list[n]
-            df.dropna(inplace=True)
-    df.dropna(inplace=True)
+
     df['squared_a'] = square_features(df['ax'].values, df['ay'].values, df['az'].values)
     df['squared_g'] = square_features(df['gx'].values, df['gy'].values, df['gz'].values)
-    df['squared_a'] = (df['squared_a'] - axis_mean_list[-2]) / axis_std_list[-2]
-    df['squared_g'] = (df['squared_g'] - axis_mean_list[-1]) / axis_std_list[-1]
+
+    for n, col in enumerate(df[columns]):
+        df[col] = pd.to_numeric(df[col])
+        df[col] = (df[col]-axis_mean_list[n])/axis_std_list[n]
+        df.dropna(inplace=True)
+    df.dropna(inplace=True)
+
+    sequential_data = []
+    prev_data = deque(maxlen=SEQ_LEN)
+    for i in df.values:
+        target = i[-3]  # el target está en la posición -3 de la fila del df
+        prev_data.append([n for n in np.delete(i, -3)])  # deleteo el target
+        if len(prev_data) == SEQ_LEN:
+            sequential_data.append([np.array(prev_data), target])  # y el target lo appendeo al final
+    random.shuffle(sequential_data)
+    return sequential_data
+
+
+def abs_variation(df: pd.DataFrame()):
+    df2 = df.iloc[1:, :].reset_index(drop=True)
+    for col in df.columns:
+        if col != 'target':
+            df[col] = df2[col] - df[col]
+    return df
+
+
+def preprocess_df_variation_norm(df: pd.DataFrame(), path) -> list:
+    mean_std_df = pd.read_csv((path + 'mean_std.csv'))
+    axis_mean_list = list(mean_std_df.loc[0])[1:]  # saco el primer valor pq es el índice del csv, no me sirve
+    axis_std_list = list(mean_std_df.loc[1])[1:]
+    df['squared_a'] = square_features(df['ax'].values, df['ay'].values, df['az'].values)
+    df['squared_g'] = square_features(df['gx'].values, df['gy'].values, df['gz'].values)
+
+    for n, col in enumerate(df[columns]):
+        df[col] = pd.to_numeric(df[col])
+        df[col] = (df[col] - axis_mean_list[n]) / axis_std_list[n]
+        df.dropna(inplace=True)
+    df.dropna(inplace=True)
+
+    df = abs_variation(df)
+    df.dropna(inplace=True)
+
     sequential_data = []
     prev_data = deque(maxlen=SEQ_LEN)
     for i in df.values:
@@ -111,7 +142,7 @@ def gen_mean_std_file(path):
 
 
 if __name__ == '__main__':
-    path = './test_data/this_is_3/'
+    path = './test_data/this_is_4/'
     main_dataset = []
     mean_std = gen_mean_std_file(path)
 
@@ -121,10 +152,10 @@ if __name__ == '__main__':
         df.drop(0, axis=0, inplace=True)
         # df.drop('i', axis=1, inplace=True)  # esta linea es para el dataset1 que tenía indice en el csv
         df.reset_index()
-        processed_df = preprocess_df_normalize(df, path)
+        processed_df = preprocess_df_variation_norm(df, path)
         main_dataset = main_dataset + processed_df
 
-    print(len(main_dataset))
+    # print(len(main_dataset), Counter([i[-1] for i in main_dataset]))
     random.shuffle(main_dataset)
     div_point = int(-VAL_PCT * len(main_dataset))
     train_dataset = main_dataset[:div_point]
@@ -133,15 +164,16 @@ if __name__ == '__main__':
     validation_x, validation_y = split_dataset(validation_dataset)
 
     # MODEL
-    model = create_model()
-    # tensorboard = TensorBoard(log_dir='logs/{}'.format(NAME))
-    checkpoint = ModelCheckpoint(f"models/m{int(time.time())}_removedlayersunrol_absnorm_seqlen{SEQ_LEN}_EPOCHS{EPOCHS}_BATCHS{BATCH_SIZE}.h5",
-                                 monitor='val_accuracy', verbose=1, save_best_only=True, mode='max')
-    model.fit(np.asarray(train_x), np.asarray(train_y),
-              batch_size=BATCH_SIZE,
-              epochs=EPOCHS,
-              validation_data=(validation_x, validation_y),
-              callbacks=[checkpoint])
-    filename = 'models/model{}_removedlayersunrol_absnorm_SEQLEN{}_2.h5'.format(int(time.time()), SEQ_LEN)
-    model.save(filename)
-
+    # model = create_model()
+    # # tensorboard = TensorBoard(log_dir='logs/{}'.format(NAME))
+    # checkpoint = ModelCheckpoint(f"models/m6.h5",
+    #                              monitor='val_accuracy', verbose=1, save_best_only=True, mode='max')
+    # start_time = time.time()
+    # model.fit(np.asarray(train_x), np.asarray(train_y),
+    #           batch_size=BATCH_SIZE,
+    #           epochs=EPOCHS,
+    #           validation_data=(validation_x, validation_y),
+    #           callbacks=[checkpoint])
+    # filename = 'models/m6_2.h5'.format(int(time.time()), SEQ_LEN)
+    # model.save(filename)
+    # print('Training time: {}'.format(time.time() - start_time))

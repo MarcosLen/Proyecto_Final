@@ -17,7 +17,7 @@ layout = html.Div([
                  interval=1400,  # in milliseconds
                  n_intervals=0),
     dcc.Interval(id='interval2',
-                 interval=350,  # in milliseconds
+                 interval=220,  # in milliseconds
                  n_intervals=0),
     html.Div([  # header
         html.Div([

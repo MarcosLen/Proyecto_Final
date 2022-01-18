@@ -27,7 +27,7 @@ layout = html.Div([
                 width='auto')
         ], className='col-2', style=head_div_style),
         html.Div([
-            html.H1('Rowing Corrector pa')
+            html.H1('Rowing Corrector')
         ], className='col-8'),
         html.Div([
             html.Img(
@@ -49,6 +49,6 @@ layout = html.Div([
                                                     {'label': 'Read Rest', 'value': 'rest'}],
                            value='predict', labelStyle={'display': 'inline-block', 'margin-left': '2%'})
         ),
-        dbc.Row(html.H1("CLASIFICACIÓN", id='label'), className='my-5', style={'text-align': 'center'})
+        dbc.Row(html.H1("CLASIFICACIÓN", id='label', style={'font-size': 60}), className='my-5', style={'text-align': 'center'})
     ], className='col-12 align-items-center', style=big_div_style)
 ], className='container')

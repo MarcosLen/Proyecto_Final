@@ -103,10 +103,10 @@ def get_data(_, checklist_value):
 
         finally:
             prediction = model.predict(np.expand_dims(np.array(dfd), 0))
-            if i > 10:
-                print(prediction[0], lista, lista_norm)
-                i = 0
-            i += 1
+            # if i > 10:
+            #     print(prediction[0], lista, lista_norm)
+            #     i = 0
+            # i += 1
             prediction = onehot_encoder.inverse_transform(prediction)
             return '{}'.format(prediction[0])
     else:
@@ -120,7 +120,6 @@ def get_data(_, checklist_value):
         if input_id == 'checklist':
             n_files += 1
             count_stored_points = 0
-            print(n_files)
 
         filename = '{}_{}.csv'.format(checklist_value, n_files)
         file = open(path + '/' + filename, 'a')

@@ -14,10 +14,10 @@ df = pd.DataFrame()
 layout = html.Div([
     dcc.Location(id='url', refresh=True),
     dcc.Interval(id='interval1',
-                 interval=1400,  # in milliseconds
+                 interval=600,  # in milliseconds
                  n_intervals=0),
     dcc.Interval(id='interval2',
-                 interval=220,  # in milliseconds
+                 interval=160,  # in milliseconds
                  n_intervals=0),
     html.Div([  # header
         html.Div([
@@ -43,12 +43,12 @@ layout = html.Div([
             dcc.Graph(id='asdasd')
             ]),
         dbc.Row(
-            dcc.RadioItems(id='checklist', options=[{'label': 'Predict', 'value': 'predict'},
-                                                    {'label': 'Read Square', 'value': 'squar'},
-                                                    {'label': 'Read Circle', 'value': 'circl'},
-                                                    {'label': 'Read Rest', 'value': 'rest'}],
+            dcc.RadioItems(id='checklist', options=[{'label': 'Clasificar', 'value': 'predict'},
+                                                    {'label': 'Leer Descanso', 'value': 'rest'},
+                                                    {'label': 'Leer Técnica Correcta', 'value': 'correct'},
+                                                    {'label': 'Leer Técnica Incorrecta', 'value': 'incorrect'}],
                            value='predict', labelStyle={'display': 'inline-block', 'margin-left': '2%'})
         ),
-        dbc.Row(html.H1("CLASIFICACIÓN", id='label', style={'font-size': 60}), className='my-5', style={'text-align': 'center'})
+        dbc.Row(html.H1("CLASIFICACIÓN", id='label', style={'font-size': 37}), className='my-5', style={'text-align': 'center'})
     ], className='col-12 align-items-center', style=big_div_style)
 ], className='container')

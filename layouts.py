@@ -1,7 +1,6 @@
 import dash_core_components as dcc
 import dash_html_components as html
 import dash_bootstrap_components as dbc
-import plotly.express as px
 import pandas as pd
 
 
@@ -14,10 +13,10 @@ df = pd.DataFrame()
 layout = html.Div([
     dcc.Location(id='url', refresh=True),
     dcc.Interval(id='interval1',
-                 interval=600,  # in milliseconds
+                 interval=600,
                  n_intervals=0),
     dcc.Interval(id='interval2',
-                 interval=160,  # in milliseconds
+                 interval=160,
                  n_intervals=0),
     html.Div([  # header
         html.Div([
@@ -40,7 +39,7 @@ layout = html.Div([
 
     html.Div([
         dbc.Row([
-            dcc.Graph(id='asdasd')
+            dcc.Graph(id='graph_1')
             ]),
         dbc.Row(
             dcc.RadioItems(id='checklist', options=[{'label': 'Clasificar', 'value': 'predict'},

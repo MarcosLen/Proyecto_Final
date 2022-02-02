@@ -1,7 +1,7 @@
 import tensorflow as tf
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, Dropout, LSTM, BatchNormalization
-from tensorflow.keras.callbacks import TensorBoard, ModelCheckpoint
+from tensorflow.keras.callbacks import ModelCheckpoint
 from sklearn.preprocessing import OneHotEncoder, scale
 import numpy as np
 import pandas as pd
@@ -11,16 +11,15 @@ import time
 import os
 from collections import Counter
 
-SEQ_LEN = 15
+SEQ_LEN = 24
 VAL_PCT = 0.2
 cols = ['ax1', 'ay1', 'az1', 'gx1', 'gy1', 'gz1',
         'ax2', 'ay2', 'az2', 'gx2', 'gy2', 'gz2',
         'ax3', 'ay3', 'az3', 'gx3', 'gy3', 'gz3',
         'ax4', 'ay4', 'az4', 'gx4', 'gy4', 'gz4']
-EPOCHS = 40
-BATCH_SIZE = 64
-NAME = '{}-SEQ-{}-TIME'.format(SEQ_LEN, int(time.time()))
-categories = [['rest'], ['corr'], ['inco']]
+EPOCHS = 20
+BATCH_SIZE = 128
+categories = [['corr'], ['inco'], ['rest']]
 onehot_encoder = OneHotEncoder(sparse=False)
 onehot_encoder.fit(categories)
 columns = ['ax1', 'ay1', 'az1', 'gx1', 'gy1', 'gz1', 'sq_a1', 'sq_g1',
@@ -30,7 +29,7 @@ columns = ['ax1', 'ay1', 'az1', 'gx1', 'gy1', 'gz1', 'sq_a1', 'sq_g1',
 
 
 def square_features(col1, col2, col3):
-    return np.sqrt(col1**2 + col2**2 + col3**2)
+    return np.sqrt((col1**2 + col2**2 + col3**2)/3)
 
 
 def abs_variation(df: pd.DataFrame()):
@@ -47,9 +46,11 @@ def preprocess_df_variation_norm(df: pd.DataFrame(), path) -> list:
     axis_std_list = list(mean_std_df.loc[1])[1:]
     df.dropna(axis=0, inplace=True)
     df = df.loc[~(df == 0).all(axis=1)]  # elimina filas con todos 0s
+
     for col in df.columns:
         if col != 'target':
             df[col] = df[col].astype(int)
+
     df['sq_a1'] = square_features(df['ax1'].values, df['ay1'].values, df['az1'].values)
     df['sq_g1'] = square_features(df['gx1'].values, df['gy1'].values, df['gz1'].values)
     df['sq_a2'] = square_features(df['ax2'].values, df['ay2'].values, df['az2'].values)
@@ -96,10 +97,10 @@ def create_model():
     model.add(Dropout(0.15))
     model.add(BatchNormalization())
     model.add(LSTM(128, input_shape=(train_x.shape[1:]), activation='relu', return_sequences=True, unroll=True))
-    model.add(Dropout(0.15))
+    model.add(Dropout(0.2))
     model.add(BatchNormalization())
     model.add(LSTM(128, input_shape=(train_x.shape[1:]), activation='relu', return_sequences=True, unroll=True))
-    model.add(Dropout(0.15))
+    model.add(Dropout(0.2))
     model.add(BatchNormalization())
     model.add(LSTM(128, input_shape=(train_x.shape[1:]), activation='relu'))
     model.add(Dropout(0.2))
@@ -108,7 +109,7 @@ def create_model():
     model.add(Dropout(0.2))
     model.add(Dense(train_y.shape[-1], activation='softmax'))
 
-    opt = tf.keras.optimizers.Adam(learning_rate=0.0009, decay=1e-6)
+    opt = tf.keras.optimizers.Adam(learning_rate=0.0007, decay=1e-6)
     model.compile(loss='categorical_crossentropy',
                   optimizer=opt,
                   metrics=['accuracy'])
@@ -121,10 +122,16 @@ def gen_mean_std_file(path):
     aux_std = []
     for item in os.listdir(path):
         dff = pd.read_csv(path + item, names=cols, index_col=False, sep=';')
+        dff.dropna(inplace=True)
+        dff = dff.loc[~(dff == 0).all(axis=1)]  # elimina filas con todos 0s
+        dff = dff.astype(int)
+        # dff = abs_variation(dff) se sacó para probar
+        dff.dropna(inplace=True)
         aux_df = aux_df.append(dff)
     # aux_df.drop(0, axis=0, inplace=True)
     aux_df.reset_index(drop=True, inplace=True)
     aux_df.dropna(inplace=True)
+
     aux_df = aux_df.loc[~(aux_df == 0).all(axis=1)]  # elimina filas con todos 0s
     aux_df = aux_df.astype(int)
     aux_df['sq_a1'] = square_features(aux_df['ax1'].values, aux_df['ay1'].values, aux_df['az1'].values)
@@ -170,14 +177,13 @@ if __name__ == '__main__':
 
     # MODEL
     model = create_model()
-    checkpoint = ModelCheckpoint(f"models/m10.h5",
-                                 monitor='val_accuracy', verbose=1, save_best_only=True, mode='max')
+    checkpoint = ModelCheckpoint("models/m12.h5", monitor='val_accuracy', verbose=1, save_best_only=True, mode='max')
     start_time = time.time()
     model.fit(np.asarray(train_x), np.asarray(train_y),
               batch_size=BATCH_SIZE,
               epochs=EPOCHS,
               validation_data=(validation_x, validation_y),
               callbacks=[checkpoint])
-    filename = 'models/m10_2.h5'.format(int(time.time()), SEQ_LEN)
+    filename = 'models/m12_2.h5'
     model.save(filename)
     print('Training time: {}'.format(time.time() - start_time))

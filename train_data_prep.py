@@ -1,8 +1,7 @@
 import tensorflow as tf
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, Dropout, LSTM, BatchNormalization
-from tensorflow.keras.callbacks import ModelCheckpoint
-from sklearn.preprocessing import OneHotEncoder, scale
+from sklearn.preprocessing import OneHotEncoder
 import numpy as np
 import pandas as pd
 from collections import deque
@@ -11,21 +10,15 @@ import time
 import os
 from collections import Counter
 
-SEQ_LEN = 24
+SEQ_LEN = 15
 VAL_PCT = 0.2
-cols = ['ax1', 'ay1', 'az1', 'gx1', 'gy1', 'gz1',
-        'ax2', 'ay2', 'az2', 'gx2', 'gy2', 'gz2',
-        'ax3', 'ay3', 'az3', 'gx3', 'gy3', 'gz3',
-        'ax4', 'ay4', 'az4', 'gx4', 'gy4', 'gz4']
+cols = ['ax', 'ay', 'az', 'gx', 'gy', 'gz']
 EPOCHS = 20
-BATCH_SIZE = 128
-categories = [['corr'], ['inco'], ['rest']]
-onehot_encoder = OneHotEncoder(sparse=False)
-onehot_encoder.fit(categories)
-columns = ['ax1', 'ay1', 'az1', 'gx1', 'gy1', 'gz1', 'sq_a1', 'sq_g1',
-           'ax2', 'ay2', 'az2', 'gx2', 'gy2', 'gz2', 'sq_a2', 'sq_g2',
-           'ax3', 'ay3', 'az3', 'gx3', 'gy3', 'gz3', 'sq_a3', 'sq_g3',
-           'ax4', 'ay4', 'az4', 'gx4', 'gy4', 'gz4', 'sq_a4', 'sq_g4']
+BATCH_SIZE = 32
+categories = [['cuadrado'], ['circular'], ['reposo']]
+onehot_encoder = OneHotEncoder(sparse=False).fit([['cuadrado'], ['circular'], ['reposo']])
+
+columns = ['ax', 'ay', 'az', 'gx', 'gy', 'gz', 'sq_a', 'sq_g']
 
 
 def square_features(col1, col2, col3):
@@ -51,14 +44,8 @@ def preprocess_df_variation_norm(df: pd.DataFrame(), path) -> list:
         if col != 'target':
             df[col] = df[col].astype(int)
 
-    df['sq_a1'] = square_features(df['ax1'].values, df['ay1'].values, df['az1'].values)
-    df['sq_g1'] = square_features(df['gx1'].values, df['gy1'].values, df['gz1'].values)
-    df['sq_a2'] = square_features(df['ax2'].values, df['ay2'].values, df['az2'].values)
-    df['sq_g2'] = square_features(df['gx2'].values, df['gy2'].values, df['gz2'].values)
-    df['sq_a3'] = square_features(df['ax3'].values, df['ay3'].values, df['az3'].values)
-    df['sq_g3'] = square_features(df['gx3'].values, df['gy3'].values, df['gz3'].values)
-    df['sq_a4'] = square_features(df['ax4'].values, df['ay4'].values, df['az4'].values)
-    df['sq_g4'] = square_features(df['gx4'].values, df['gy4'].values, df['gz4'].values)
+    df['sq_a'] = square_features(df['ax'].values, df['ay'].values, df['az'].values)
+    df['sq_g'] = square_features(df['gx'].values, df['gy'].values, df['gz'].values)
 
     for n, col in enumerate(df[columns]):
         df[col] = pd.to_numeric(df[col])
@@ -72,8 +59,8 @@ def preprocess_df_variation_norm(df: pd.DataFrame(), path) -> list:
     sequential_data = []
     prev_data = deque(maxlen=SEQ_LEN)
     for i in df.values:
-        target = i[-9]  # -9 es el target, pq los ultimos 8 datos son los valores al cuadrado
-        prev_data.append([n for n in np.delete(i, -9)])  # deleteo el target
+        target = i[-3]  # -3 es el target, pq los ultimos 2 datos son los valores al cuadrado
+        prev_data.append([n for n in np.delete(i, -3)])  # deleteo el target
         if len(prev_data) == SEQ_LEN:
             sequential_data.append([np.array(prev_data), target])  # y el target lo appendeo al final
     random.shuffle(sequential_data)
@@ -93,26 +80,18 @@ def split_dataset(total_data):
 
 def create_model():
     model = Sequential()
-    model.add(LSTM(256, input_shape=(train_x.shape[1:]), activation='relu', return_sequences=True, unroll=True))
+    model.add(LSTM(32, input_shape=(train_x.shape[1:]), activation='relu', return_sequences=False, unroll=True))
     model.add(Dropout(0.15))
     model.add(BatchNormalization())
-    model.add(LSTM(128, input_shape=(train_x.shape[1:]), activation='relu', return_sequences=True, unroll=True))
-    model.add(Dropout(0.2))
-    model.add(BatchNormalization())
-    model.add(LSTM(128, input_shape=(train_x.shape[1:]), activation='relu', return_sequences=True, unroll=True))
-    model.add(Dropout(0.2))
-    model.add(BatchNormalization())
-    model.add(LSTM(128, input_shape=(train_x.shape[1:]), activation='relu'))
-    model.add(Dropout(0.2))
-    model.add(BatchNormalization())
-    model.add(Dense(32, activation='relu'))
+    model.add(Dense(16, activation='relu'))
     model.add(Dropout(0.2))
     model.add(Dense(train_y.shape[-1], activation='softmax'))
 
-    opt = tf.keras.optimizers.Adam(learning_rate=0.0007, decay=1e-6)
+    opt = tf.keras.optimizers.Adam(learning_rate=0.0009, decay=1e-6)
     model.compile(loss='categorical_crossentropy',
                   optimizer=opt,
                   metrics=['accuracy'])
+    print(model.summary())
     return model
 
 
@@ -125,23 +104,15 @@ def gen_mean_std_file(path):
         dff.dropna(inplace=True)
         dff = dff.loc[~(dff == 0).all(axis=1)]  # elimina filas con todos 0s
         dff = dff.astype(int)
-        # dff = abs_variation(dff) se sacó para probar
         dff.dropna(inplace=True)
         aux_df = aux_df.append(dff)
-    # aux_df.drop(0, axis=0, inplace=True)
     aux_df.reset_index(drop=True, inplace=True)
     aux_df.dropna(inplace=True)
 
     aux_df = aux_df.loc[~(aux_df == 0).all(axis=1)]  # elimina filas con todos 0s
     aux_df = aux_df.astype(int)
-    aux_df['sq_a1'] = square_features(aux_df['ax1'].values, aux_df['ay1'].values, aux_df['az1'].values)
-    aux_df['sq_g1'] = square_features(aux_df['gx1'].values, aux_df['gy1'].values, aux_df['gz1'].values)
-    aux_df['sq_a2'] = square_features(aux_df['ax2'].values, aux_df['ay2'].values, aux_df['az2'].values)
-    aux_df['sq_g2'] = square_features(aux_df['gx2'].values, aux_df['gy2'].values, aux_df['gz2'].values)
-    aux_df['sq_a3'] = square_features(aux_df['ax3'].values, aux_df['ay3'].values, aux_df['az3'].values)
-    aux_df['sq_g3'] = square_features(aux_df['gx3'].values, aux_df['gy3'].values, aux_df['gz3'].values)
-    aux_df['sq_a4'] = square_features(aux_df['ax4'].values, aux_df['ay4'].values, aux_df['az4'].values)
-    aux_df['sq_g4'] = square_features(aux_df['gx4'].values, aux_df['gy4'].values, aux_df['gz4'].values)
+    aux_df['sq_a'] = square_features(aux_df['ax'].values, aux_df['ay'].values, aux_df['az'].values)
+    aux_df['sq_g'] = square_features(aux_df['gx'].values, aux_df['gy'].values, aux_df['gz'].values)
 
     for col in aux_df.columns:
         aux_df[col] = pd.to_numeric(aux_df[col])
@@ -153,14 +124,14 @@ def gen_mean_std_file(path):
 
 
 if __name__ == '__main__':
-    path = './test_data/rowing_corrector_data/'
+    path = './test_data/Datos_2024/'
     main_dataset = []
     mean_std = gen_mean_std_file(path)
 
     for item in os.listdir(path):
         if item != 'mean_std.csv':
             df = pd.read_csv(path + item, names=cols, index_col=False, sep=';')
-            df['target'] = item[:4]  # item es, por ej, 'circle_12.csv', por lo que target será 'circ'
+            df['target'] = item[:-6]  # item es, por ej, 'cuadrado_2.csv', por lo que target será 'cuadrado'
             df.drop(0, axis=0, inplace=True)
             df.reset_index()
 
@@ -169,21 +140,21 @@ if __name__ == '__main__':
 
     random.shuffle(main_dataset)
     print(len(main_dataset), Counter([i[-1] for i in main_dataset]))
+    # se hace un print para saber la longitud del dataset y cómo están distribuidas las categorías
     div_point = int(-VAL_PCT * len(main_dataset))
     train_dataset = main_dataset[:div_point]
     validation_dataset = main_dataset[div_point:]
     train_x, train_y = split_dataset(train_dataset)
+    # print(train_x[5], train_y[5])  # se hace un print para ver qué forma tiene un dato
     validation_x, validation_y = split_dataset(validation_dataset)
 
     # MODEL
     model = create_model()
-    checkpoint = ModelCheckpoint("models/m12.h5", monitor='val_accuracy', verbose=1, save_best_only=True, mode='max')
     start_time = time.time()
     model.fit(np.asarray(train_x), np.asarray(train_y),
               batch_size=BATCH_SIZE,
               epochs=EPOCHS,
-              validation_data=(validation_x, validation_y),
-              callbacks=[checkpoint])
-    filename = 'models/m12_2.h5'
+              validation_data=(validation_x, validation_y))
+    filename = 'models/modelo4.h5'
     model.save(filename)
     print('Training time: {}'.format(time.time() - start_time))

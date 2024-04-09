@@ -19,6 +19,7 @@
 #define    ACC_FULL_SCALE_16_G       0x18
 
 String movimiento;
+int j = 0;
 
 
 //Funcion auxiliar lectura
@@ -53,9 +54,9 @@ void setup()
    // while(!Serial);
    // Serial.println("started");
    // Configurar acelerometro
-   I2CwriteByte(MPU9250_ADDRESS, 28, ACC_FULL_SCALE_16_G);
+   I2CwriteByte(MPU9250_ADDRESS, 28, ACC_FULL_SCALE_2_G);
    // Configurar giroscopio
-   I2CwriteByte(MPU9250_ADDRESS, 27, GYRO_FULL_SCALE_2000_DPS);
+   I2CwriteByte(MPU9250_ADDRESS, 27, GYRO_FULL_SCALE_250_DPS);
    // Configurar magnetometro
    I2CwriteByte(MPU9250_ADDRESS, 0x37, 0x02);
    I2CwriteByte(MAG_ADDRESS, 0x0A, 0x01);
@@ -96,25 +97,29 @@ void loop()
      } while (!(ST1 & 0x01));
           uint8_t Mag[7];
      I2Cread(MAG_ADDRESS, 0x03, 7, Mag);
-       
-     // --- Mostrar valores ---
-          // Acelerometro
-     Serial.print(ax, DEC);
-     Serial.print("\t");
-     Serial.print(ay, DEC);
-     Serial.print("\t");
-     Serial.print(az, DEC);
-     Serial.print("\t");
-          // Giroscopio
-     Serial.print(gx, DEC);
-     Serial.print("\t");
-     Serial.print(gy, DEC);
-     Serial.print("\t");
-     Serial.print(gz, DEC);
-     Serial.println();
-    
-     //Serial.println(movimiento);
-     delay(100);    
+     if (j<1100){
+       // --- Mostrar valores ---
+            // Acelerometro
+       Serial.print(j);
+       Serial.print("\t");
+       Serial.print(ax, DEC);
+       Serial.print("\t");
+       Serial.print(ay, DEC);
+       Serial.print("\t");
+       Serial.print(az, DEC);
+       Serial.print("\t");
+            // Giroscopio
+       Serial.print(gx, DEC);
+       Serial.print("\t");
+       Serial.print(gy, DEC);
+       Serial.print("\t");
+       Serial.print(gz, DEC);
+       Serial.println();
+      
+       //Serial.println(movimiento);
+       delay(20);
+       j = j + 1;
+     }
     }
    //delay(500);
 }
